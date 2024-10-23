@@ -385,7 +385,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				local stored = joint:GetAttribute("_replay_stored_cframe")
 				if stored then
 					joint_transform = joint.C0:ToObjectSpace(stored)
-				elseif not stored and joint:IsA("JointInstance") then
+				elseif not stored and joint:IsA("Motor6D") then
 					joint_transform = joint.Transform
 				end
 				original_cframe = joint_transform
