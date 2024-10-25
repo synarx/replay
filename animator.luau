@@ -491,7 +491,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				
 				table.insert(playing, track)
 				
-				if track.Priority.Value > highest_prio then
+				if track.Priority.Value < highest_prio then
 					highest_prio = track.Priority.Value
 				end
 				track._joints = self._joints
@@ -533,6 +533,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			end
 			
 			if final_transform then 
+				print(final_transform)
 				for joint, cf in final_transform do
 					self._joint_updater(joint, cf)
 				end
