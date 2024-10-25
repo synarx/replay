@@ -1,5 +1,5 @@
 local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
-	local FORMAT_VERSION = 1
+	local FORMAT_VERSION = 2
 
 	local RunService = game:GetService("RunService")
 	local TweenService = game:GetService("TweenService")
@@ -30,13 +30,13 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 
 	local function decode(b)
 		local keyframes, rig = {}, {}
-		local format_version, kf_count, looping, joint_count = buffer.readu8(b, 0), buffer.readu16(b, 1), buffer.readu8(b, 3), buffer.readu8(b, 4)
+		local format_version, kf_count, looping, priority, joint_count = buffer.readu8(b, 0), buffer.readu16(b, 1), buffer.readu8(b, 3), buffer.readu8(b, 4), buffer.readu8(b, 5)
 
 		if format_version ~= FORMAT_VERSION and not Animator.SILENCE_FORMAT_VERSION_WARNINGS then
 			error(`incompatiable format version - it will probably not work\n\ncurrent format version: {FORMAT_VERSION}\nanimation format version: {format_version}\n\nyou can stop seeing this message by setting Animator.SILENCE_FORMAT_VERSION_WARNINGS to true, reverting to an older animator or updating your animation to the newer encoder.`)
 		end
 
-		local offset = 5
+		local offset = 6
 
 		for i = 1, joint_count do
 			local len = buffer.readu8(b, offset)
@@ -71,7 +71,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			for _ = 1, pose_count do
 				local rig_idx, weight, ease = buffer.readu8(b, offset), buffer.readu8(b, offset + 1), buffer.readu8(b, offset + 2)
 				local ease = buffer.readu8(b, offset + 2)
-				local ease_dir, ease_style = bit32.rshift(bit32.band(ease, 0xF0), 4) + 1, bit32.band(ease, 0x0F) + 1
+				local ease_dir, ease_style = bit32.rshift(bit32.band(ease, 0xF0), 4), bit32.band(ease, 0x0F)
 				
 				kf.poses[rig[rig_idx]] = {
 					name = rig[rig_idx],
@@ -109,7 +109,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			end
 		end
 				
-		return {keyframes = keyframes, looped = looping == 1, length = length}
+		return {keyframes = keyframes, looped = looping == 1, length = length, priority = Enum.AnimationPriority:GetEnumItems()[priority]}
 	end
 
 	local function base64decode(base64)
@@ -479,6 +479,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			end
 		end
 		
+		local last_active_track
 		self._loop = RunService.Heartbeat:Connect(function(dt)
 			local highest_prio = Enum.AnimationPriority.Core.Value
 			
@@ -494,6 +495,11 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 					highest_prio = track.Priority.Value
 				end
 				track._joints = self._joints
+			end
+			
+			if #playing == 0 and last_active_track then
+				highest_prio = last_active_track.Priority.Value
+				table.insert(playing, last_active_track)
 			end
 			
 			local active_tracks, active_transforms = {}, {}
@@ -523,6 +529,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 						final_transform[idx] = last_transform[idx]:Lerp(cf, alpha)
 					end
 				end
+				last_active_track = track
 			end
 			
 			if final_transform then 
