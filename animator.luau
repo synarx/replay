@@ -296,14 +296,15 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 	end
 
 	function AnimationTrack:_update_weight(dt)
-		if self._last_weight_target ~= self.WeightTarget then
+		local target = self.WeightTarget
+		if self._last_weight_target ~= target then
 			self._fade_time_tick = 0
 			self._last_weight_current = self.WeightCurrent
 		else
 			self._fade_time_tick += dt / self._fade_time
-			self.WeightCurrent = self._last_weight_current + (self.WeightTarget - self._last_weight_current) * math.clamp(self._fade_time_tick, 0, 1)
+			self.WeightCurrent = self._last_weight_current + (target - self._last_weight_current) * math.clamp(self._fade_time_tick, 0, 1)
 		end
-		self._last_weight_target = self.WeightTarget
+		self._last_weight_target = target
 	end
 
 	function AnimationTrack:_update(dt)
@@ -440,6 +441,9 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			local is_bone = joint:IsA("Bone")
 			local is_joint = (joint:IsA("Motor6D") and joint.Enabled)
 			if is_joint or is_bone then
+				if not joint.Part1 then
+					joint:GetPropertyChangedSignal("Part1"):Wait()
+				end
 				local joint_name = (is_bone and joint.Name or is_joint and joint.Part1.Name)
 
 				local current_joint = self._joints[joint_name]
@@ -486,30 +490,18 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			end
 		end
 		
-		local maxPriorities = 7
-		local function calcPriority(current)
-			local priority = 0
-			if current == Enum.AnimationPriority.Action4 then
-				priority = maxPriorities
-			elseif current == Enum.AnimationPriority.Action3 then
-				priority = maxPriorities - 1
-			elseif current == Enum.AnimationPriority.Action2 then
-				priority = maxPriorities - 2
-			elseif current == Enum.AnimationPriority.Action then
-				priority = maxPriorities - 3
-			elseif current == Enum.AnimationPriority.Movement then
-				priority = maxPriorities - 4
-			elseif current == Enum.AnimationPriority.Idle then
-				priority = maxPriorities - 5
-			elseif current == Enum.AnimationPriority.Core then
-				priority = maxPriorities - 6
-			end
-			return priority
+		local priorities = {}
+		for idx, prio in Enum.AnimationPriority:GetEnumItems() do
+			priorities[prio] = idx
 		end
-
+		
+		local function calc_priority(prio)
+			return priorities[prio]
+		end
+		
 		local last_active_track
 		self._loop = RunService.Heartbeat:Connect(function(dt)
-			local highest_prio = Enum.AnimationPriority.Core.Value
+			local highest_prio = 0
 
 			local playing = {}
 			for _, track in self._tracks do
@@ -519,22 +511,22 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 
 				table.insert(playing, track)
 				
-				local prio = calcPriority(track.Priority)
-				if prio < highest_prio then
+				local prio = calc_priority(track.Priority)
+				if prio > highest_prio then
 					highest_prio = prio
 				end
 				track._joints = self._joints
 			end
 
 			if #playing == 0 and last_active_track then
-				highest_prio = calcPriority(last_active_track.Priority)
+				highest_prio = calc_priority(last_active_track.Priority)
 				table.insert(playing, last_active_track)
 			end
 
 			local active_tracks, active_transforms = {}, {}
 			local weight_total = 0
 			for _, track in playing do
-				if calcPriority(track.Priority) == highest_prio then
+				if calc_priority(track.Priority) == highest_prio then
 					local transforms = track:_update(dt)
 					table.insert(active_tracks, track)
 					table.insert(active_transforms, transforms)
@@ -545,17 +537,22 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			local final_transform
 			for idx, track in active_tracks do
 				final_transform = active_transforms[idx]
+				
+				local alpha
+				if weight_total == 0 then
+					alpha = 0
+				else
+					alpha = 1 - math.clamp(track.WeightCurrent / weight_total, 0, 1)
+				end
+				
 				local last_track = active_tracks[idx - 1]
 				if last_track then
 					local last_transform = active_transforms[idx - 1]
-					for idx, cf in final_transform do
+					for idx in final_transform do
 						if not last_transform[idx] then continue end
 
-						local alpha = math.clamp(track.WeightCurrent / weight_total, 0, 1)
-						if weight_total == 0 then
-							alpha = 0
-						end
-						final_transform[idx] = last_transform[idx]:Lerp(cf, alpha)
+					
+						final_transform[idx] *= last_transform[idx]:Lerp(CFrame.identity, alpha)
 					end
 				end
 				last_active_track = track
