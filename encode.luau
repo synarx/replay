@@ -1,5 +1,5 @@
 --!native
-local FORMAT_VERSION = 1
+local FORMAT_VERSION = 2
 
 local function buffer_writei24(b, offset, value)
 	if value < 0 then
@@ -32,6 +32,10 @@ local function writeCFrame(b, offset, cframe: CFrame)
 	buffer.writeu16(b, offset + 9, rx_scaled)
 	buffer.writeu16(b, offset + 11, ry_scaled)
 	buffer.writeu16(b, offset + 13, rz_scaled)
+end
+
+local function indexFromEnum(enum, value)
+	return table.find(enum:GetEnumItems(), value) or 1
 end
 
 return function(keyframe_sequence)
@@ -73,13 +77,14 @@ return function(keyframe_sequence)
 		return a.timestamp < b.timestamp
 	end)
 
-	local b = buffer.create(buffer_size + 5)
+	local b = buffer.create(buffer_size + 6)
 	buffer.writeu8(b, 0, FORMAT_VERSION)
 	buffer.writeu16(b, 1, #struct)
 	buffer.writeu8(b, 3, keyframe_sequence.Loop and 1 or 0)
-	buffer.writeu8(b, 4, #rig_index)
+	buffer.writeu8(b, 4, indexFromEnum(Enum.AnimationPriority, keyframe_sequence.Priority))
+	buffer.writeu8(b, 5, #rig_index)
 
-	local offset = 5
+	local offset = 6
 
 	for index, name in ipairs(rig_index) do
 		buffer.writeu8(b, offset, #name)
@@ -111,7 +116,7 @@ return function(keyframe_sequence)
 
 			buffer.writeu8(b, offset, index)
 			buffer.writeu8(b, offset + 1, pose.Weight)
-			buffer.writeu8(b, offset + 2, bit32.bor(bit32.lshift(pose.EasingDirection.Value, 4), pose.EasingStyle.Value))
+			buffer.writeu8(b, offset + 2, bit32.bor(bit32.lshift(indexFromEnum(Enum.EasingDirection, pose.EasingDirection), 4), indexFromEnum(Enum.EasingStyle, pose.EasingStyle)))
 			writeCFrame(b, offset + 3, pose.CFrame)
 			offset += 1 + 1 + 1 + 15
 		end
