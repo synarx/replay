@@ -307,7 +307,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 	end
 
 	function AnimationTrack:_update(dt)
-		if self.WeightCurrent == 0 then
+		if self.WeightCurrent == 0 and not self.IsPlaying then
 			if not self._did_ended then
 				self._did_ended = true
 				self.Ended:Fire()
@@ -485,6 +485,27 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				joint[prop] = joint:GetAttribute(ATTRIBUTE_NAME) * transform
 			end
 		end
+		
+		local maxPriorities = 7
+		local function calcPriority(current)
+			local priority = 0
+			if current == Enum.AnimationPriority.Action4 then
+				priority = maxPriorities
+			elseif current == Enum.AnimationPriority.Action3 then
+				priority = maxPriorities - 1
+			elseif current == Enum.AnimationPriority.Action2 then
+				priority = maxPriorities - 2
+			elseif current == Enum.AnimationPriority.Action then
+				priority = maxPriorities - 3
+			elseif current == Enum.AnimationPriority.Movement then
+				priority = maxPriorities - 4
+			elseif current == Enum.AnimationPriority.Idle then
+				priority = maxPriorities - 5
+			elseif current == Enum.AnimationPriority.Core then
+				priority = maxPriorities - 6
+			end
+			return priority
+		end
 
 		local last_active_track
 		self._loop = RunService.Heartbeat:Connect(function(dt)
@@ -497,22 +518,23 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				if not track.IsPlaying then continue end
 
 				table.insert(playing, track)
-
-				if track.Priority.Value < highest_prio then
-					highest_prio = track.Priority.Value
+				
+				local prio = calcPriority(track.Priority)
+				if prio < highest_prio then
+					highest_prio = prio
 				end
 				track._joints = self._joints
 			end
 
 			if #playing == 0 and last_active_track then
-				highest_prio = last_active_track.Priority.Value
+				highest_prio = calcPriority(last_active_track.Priority)
 				table.insert(playing, last_active_track)
 			end
 
 			local active_tracks, active_transforms = {}, {}
 			local weight_total = 0
 			for _, track in playing do
-				if track.Priority.Value == highest_prio then
+				if calcPriority(track.Priority) == highest_prio then
 					local transforms = track:_update(dt)
 					table.insert(active_tracks, track)
 					table.insert(active_transforms, transforms)
