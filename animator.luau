@@ -433,8 +433,11 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 		end)
 		
 		local function add_joint(joint)
-			if (joint:IsA("Motor6D") and joint.Enabled) or joint:IsA("Bone") then
-				local joint_name = joint.Part1.Name
+			local is_bone = joint:IsA("Bone")
+			local is_joint = (joint:IsA("Motor6D") and joint.Enabled)
+			if is_joint or is_bone then
+				local joint_name = (is_bone and joint.Name or is_joint and joint.Part1.Name)
+				
 				local current_joint = self._joints[joint_name]
 
 				if not current_joint then
