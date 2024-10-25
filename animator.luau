@@ -533,7 +533,6 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			end
 			
 			if final_transform then 
-				print(final_transform)
 				for joint, cf in final_transform do
 					self._joint_updater(joint, cf)
 				end
