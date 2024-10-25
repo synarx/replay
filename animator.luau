@@ -3,7 +3,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 
 	local RunService = game:GetService("RunService")
 	local TweenService = game:GetService("TweenService")
-	
+
 	local dir, style = Enum.EasingDirection:GetEnumItems(), Enum.EasingStyle:GetEnumItems()
 
 	local function read_i24(b, o)
@@ -47,23 +47,23 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 		for _ = 1, kf_count do
 			local ts, marker_count = buffer.readf32(b, offset), buffer.readu8(b, offset + 4)
 			offset += 5
-			
+
 			local markers = {}
-			
+
 			for _ = 1, marker_count do
 				local marker_name_length = buffer.readu8(b, offset)
 				local marker_name = buffer.readstring(b, offset + 1, marker_name_length)
-				
+
 				local value_length = buffer.readu8(b, offset + 1 + marker_name_length)
 				local value = buffer.readstring(b, offset + 2 + marker_name_length, value_length)
-				
+
 				table.insert(markers, {value = value, name = marker_name})
-				
+
 				offset += 2 + marker_name_length + value_length
 			end
-			
+
 			local pose_count = buffer.readu8(b, offset)
-			
+
 			offset += 1
 
 			local kf = {poses = {}, markers = markers, timestamp = ts}
@@ -72,7 +72,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				local rig_idx, weight, ease = buffer.readu8(b, offset), buffer.readu8(b, offset + 1), buffer.readu8(b, offset + 2)
 				local ease = buffer.readu8(b, offset + 2)
 				local ease_dir, ease_style = bit32.rshift(bit32.band(ease, 0xF0), 4), bit32.band(ease, 0x0F)
-				
+
 				kf.poses[rig[rig_idx]] = {
 					name = rig[rig_idx],
 					weight = weight,
@@ -86,14 +86,14 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 
 			table.insert(keyframes, kf)
 		end
-		
+
 		local length = 0
-		
+
 		for keyframe_idx, keyframe in ipairs(keyframes) do
 			if keyframe.timestamp > length then
 				length = keyframe.timestamp
 			end
-			
+
 			for pose_idx, pose in keyframe.poses do
 				local idx = keyframe_idx
 				local next_keyframe
@@ -108,7 +108,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				end
 			end
 		end
-				
+
 		return {keyframes = keyframes, looped = looping == 1, length = length, priority = Enum.AnimationPriority:GetEnumItems()[priority]}
 	end
 
@@ -219,10 +219,10 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 
 	local AnimationTrack = {}
 	AnimationTrack.__index = AnimationTrack
-	
+
 	local DEFAULT_FADE_TIME = 0.1
 	local DEFAULT_WEIGHT = 1
-		
+
 	function AnimationTrack.new(animation)
 		local self = setmetatable({}, AnimationTrack)
 		self._joints = {}
@@ -236,7 +236,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 		self._original_cframes = {}
 
 		self._marker_events = {}
-		
+
 		self.DidLoop = Signal.new()
 		self.Ended = Signal.new()
 		self.Stopped = Signal.new()
@@ -260,22 +260,22 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 
 		return self
 	end
-	
+
 	function AnimationTrack:GetMarkerReachedSignal(name)
 		local event = Signal.new()
 		self._marker_events[name] = event
 		return event
 	end
-	
+
 	function AnimationTrack:AdjustSpeed(speed)
 		self.Speed = speed
 	end
-	
+
 	function AnimationTrack:AdjustWeight(weight, fadeTime)
 		self.WeightTarget = weight or DEFAULT_WEIGHT
 		self._fade_time = fadeTime or DEFAULT_FADE_TIME
 	end
-	
+
 	function AnimationTrack:Play(fadeTime, weight, speed)
 		self.Speed = speed or 1
 		self._fade_time = fadeTime or DEFAULT_FADE_TIME
@@ -287,14 +287,14 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 		self.TimePosition = 0
 		self._original_cframes = {}
 	end
-	
+
 	function AnimationTrack:Stop(fadeTime)
 		self.WeightTarget = 0
 		self._fade_time = fadeTime or DEFAULT_FADE_TIME
 		self.IsPlaying = false
 		self.Stopped:Fire()
 	end
-	
+
 	function AnimationTrack:_update_weight(dt)
 		if self._last_weight_target ~= self.WeightTarget then
 			self._fade_time_tick = 0
@@ -305,7 +305,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 		end
 		self._last_weight_target = self.WeightTarget
 	end
-	
+
 	function AnimationTrack:_update(dt)
 		if self.WeightCurrent == 0 then
 			if not self._did_ended then
@@ -313,7 +313,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				self.Ended:Fire()
 			end
 		end
-		
+
 		if self.IsPlaying then
 			self.TimePosition += dt * self.Speed
 			if self.TimePosition < 0 then
@@ -332,9 +332,9 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				end
 			end
 		end
-		
+
 		local keyframes = self._animation.keyframes
-		
+
 		local keyframe_idx = 1
 		local current_keyframe = keyframes[keyframe_idx]
 
@@ -347,13 +347,13 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 		end
 
 		local keyframe_timepos = self.TimePosition - current_keyframe.timestamp
-		
+
 		local transforms = {}
-		
+
 		for name, joint in self._joints do
 			local active_keyframe = current_keyframe
 			local pose = active_keyframe.poses[name]
-			
+
 			if not pose then
 				local offset = 1
 				while true do
@@ -365,7 +365,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				end
 				pose = active_keyframe and active_keyframe.poses[name]
 			end
-			
+
 			if pose then
 				local next_keyframe = pose.next_keyframe and keyframes[pose.next_keyframe]
 				if next_keyframe then
@@ -377,16 +377,20 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				end
 			end
 		end
-		
+
 		for name, joint in self._joints do
 			local original_cframe = self._original_cframes[joint]
 			if not original_cframe then
-				local joint_transform = joint.C0
+				local joint_transform = CFrame.identity
 				local stored = joint:GetAttribute("_replay_stored_cframe")
 				if stored then
 					joint_transform = joint.C0:ToObjectSpace(stored)
-				elseif not stored and joint:IsA("Motor6D") then
-					joint_transform = joint.Transform
+				else
+					if joint:IsA("Motor6D") or joint:IsA("Bone") then
+						joint_transform = joint.Transform
+					else
+						joint_transform = joint.C0
+					end
 				end
 				original_cframe = joint_transform
 				self._original_cframes[joint] = original_cframe
@@ -394,7 +398,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 			local cframe = transforms[joint] or CFrame.identity
 			transforms[joint] = original_cframe:Lerp(cframe, math.clamp(self.WeightCurrent, 0, 1))
 		end
-		
+
 		if keyframe_idx ~= self._last_keyframe_idx then
 			for _, marker in current_keyframe.markers do
 				local event = self._marker_events[marker.name]
@@ -403,20 +407,20 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				end
 			end
 		end
-		
+
 		self._last_keyframe_idx = keyframe_idx
-		
+
 		return transforms
 	end
 
 	Animator.__index = Animator
-	
+
 	local animator_cache = {}
 	function Animator.new(rig, raw_cframe)
 		if animator_cache[rig] then
 			return animator_cache[rig]
 		end
-		
+
 		local self = setmetatable({}, Animator)
 		self._tracks = {}
 		self._joints = {}
@@ -427,17 +431,17 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 		self.AnimationPlayed = Signal.new()
 		self.AnimationStopped = Signal.new()
 		self.Destroying = Signal.new()
-		
+
 		rig.Destroying:Once(function()
 			self:Destroy()
 		end)
-		
+
 		local function add_joint(joint)
 			local is_bone = joint:IsA("Bone")
 			local is_joint = (joint:IsA("Motor6D") and joint.Enabled)
 			if is_joint or is_bone then
 				local joint_name = (is_bone and joint.Name or is_joint and joint.Part1.Name)
-				
+
 				local current_joint = self._joints[joint_name]
 
 				if not current_joint then
@@ -481,30 +485,30 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				joint[prop] = joint:GetAttribute(ATTRIBUTE_NAME) * transform
 			end
 		end
-		
+
 		local last_active_track
 		self._loop = RunService.Heartbeat:Connect(function(dt)
 			local highest_prio = Enum.AnimationPriority.Core.Value
-			
+
 			local playing = {}
 			for _, track in self._tracks do
 				track:_update_weight(dt)
-				
+
 				if not track.IsPlaying then continue end
-				
+
 				table.insert(playing, track)
-				
+
 				if track.Priority.Value < highest_prio then
 					highest_prio = track.Priority.Value
 				end
 				track._joints = self._joints
 			end
-			
+
 			if #playing == 0 and last_active_track then
 				highest_prio = last_active_track.Priority.Value
 				table.insert(playing, last_active_track)
 			end
-			
+
 			local active_tracks, active_transforms = {}, {}
 			local weight_total = 0
 			for _, track in playing do
@@ -515,7 +519,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 					weight_total += track.WeightCurrent
 				end
 			end
-			
+
 			local final_transform
 			for idx, track in active_tracks do
 				final_transform = active_transforms[idx]
@@ -524,7 +528,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 					local last_transform = active_transforms[idx - 1]
 					for idx, cf in final_transform do
 						if not last_transform[idx] then continue end
-						
+
 						local alpha = math.clamp(track.WeightCurrent / weight_total, 0, 1)
 						if weight_total == 0 then
 							alpha = 0
@@ -534,23 +538,23 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 				end
 				last_active_track = track
 			end
-			
+
 			if final_transform then 
 				for joint, cf in final_transform do
 					self._joint_updater(joint, cf)
 				end
 			end
 		end)
-		
+
 		animator_cache[rig] = self
-		
+
 		return self
 	end
-	
+
 	function Animator:SetJointUpdater(callback)
 		self._joint_updater = callback
 	end
-	
+
 	function Animator:Destroy()
 		self.Destroying:Fire()
 		self._tracks = {}
@@ -573,10 +577,10 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 		if typeof(animation) ~= "table" then
 			data = decode(base64decode(data))
 		end
-		
+
 		local track = AnimationTrack.new(data)
 		track._joints = self._joints
-		
+
 		local track_idx = #self._tracks + 1
 		table.insert(self._tracks, track)
 
@@ -605,7 +609,7 @@ local Animator = {SILENCE_FORMAT_VERSION_WARNINGS = false} do
 
 		return playing
 	end
-	
+
 	function Animator:StepAnimations(dt)
 		for _, track in self:GetPlayingAnimationTracks() do
 			track:_update(dt)
